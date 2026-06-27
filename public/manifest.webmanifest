@@ -1,0 +1,17 @@
+{
+  "name": "Hermes Bluesky Feed",
+  "short_name": "Hermes Sky",
+  "description": "A mobile AT Protocol feed reader for Bluesky.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4efe3",
+  "theme_color": "#165a72",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
