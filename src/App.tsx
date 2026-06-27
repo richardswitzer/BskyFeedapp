@@ -70,7 +70,13 @@ function normalizeHandle(value: string): string {
 }
 
 function normalizeApiBaseUrl(value: string): string {
-  return value.trim().replace(/\/+$/g, "");
+  const trimmed = value.trim().replace(/[.)\]]+$/g, "").replace(/\/+$/g, "");
+
+  if (trimmed.startsWith("http://") && trimmed.endsWith(".loca.lt")) {
+    return `https://${trimmed.slice("http://".length)}`;
+  }
+
+  return trimmed;
 }
 
 function needsHttpsTunnel(apiBaseUrl: string): boolean {
