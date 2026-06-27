@@ -24,7 +24,7 @@ Current feed behavior:
 
 - Following: public preview built from accounts followed by `rswitz.bsky.social`.
 - Discover: Bluesky's public Discover generator feed.
-- Add to Hermes: saves the selected Bluesky post URL through the local Hermes API.
+- Add to Hermes: saves the selected Bluesky post URL through the local Hermes API, then also saves linked article URLs found in the post text, link facets, or external embeds.
 
 For Add to Hermes, open Hermes capture settings in the app and enter:
 

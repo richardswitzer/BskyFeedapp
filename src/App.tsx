@@ -14,10 +14,19 @@ type FeedPost = {
   record?: {
     text?: string;
     createdAt?: string;
+    facets?: Array<{
+      features?: Array<{
+        $type?: string;
+        uri?: string;
+      }>;
+    }>;
   };
   embed?: {
     images?: Array<{ thumb?: string; fullsize?: string; alt?: string }>;
     external?: { uri?: string; title?: string; description?: string; thumb?: string };
+    media?: {
+      external?: { uri?: string; title?: string; description?: string; thumb?: string };
+    };
   };
   replyCount?: number;
   repostCount?: number;
@@ -95,6 +104,48 @@ function captureNetworkMessage(apiBaseUrl: string, message: string): string {
   }
 
   return message;
+}
+
+function cleanLinkedUrl(value: string): string | undefined {
+  const trimmed = value.trim().replace(/[),.;\]]+$/g, "");
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractLinkedContentUrls(post: FeedPost): string[] {
+  const candidates = [
+    post.embed?.external?.uri,
+    post.embed?.media?.external?.uri,
+    ...(post.record?.facets || []).flatMap((facet) => facet.features || []).map((feature) => feature.uri),
+    ...(post.record?.text?.match(/https?:\/\/\S+/g) || []),
+  ];
+  const urls = candidates.flatMap((candidate) => {
+    const cleaned = candidate ? cleanLinkedUrl(candidate) : undefined;
+    return cleaned ? [cleaned] : [];
+  });
+
+  return Array.from(new Set(urls));
+}
+
+async function captureWithHermes(apiBaseUrl: string, apiKey: string, url: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/capture`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url }),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(typeof payload.error === "string" ? payload.error : `${response.status} ${response.statusText}`);
+  }
 }
 
 function byNewestPost(left: FeedItem, right: FeedItem): number {
@@ -234,6 +285,7 @@ function App() {
     const url = postUrl(post);
     const apiBaseUrl = normalizeApiBaseUrl(hermesApiBaseUrl);
     const apiKey = hermesApiKey.trim();
+    const linkedUrls = extractLinkedContentUrls(post).filter((linkedUrl) => linkedUrl !== url);
 
     if (!apiBaseUrl || !apiKey) {
       setCaptureState((current) => ({ ...current, [post.uri]: "error" }));
@@ -251,26 +303,38 @@ function App() {
     }
 
     setCaptureState((current) => ({ ...current, [post.uri]: "saving" }));
-    setCaptureMessage((current) => ({ ...current, [post.uri]: "Saving to Hermes..." }));
+    setCaptureMessage((current) => ({
+      ...current,
+      [post.uri]: linkedUrls.length ? `Saving post and ${linkedUrls.length} linked page${linkedUrls.length === 1 ? "" : "s"} to Hermes...` : "Saving post to Hermes...",
+    }));
     setError("");
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/capture`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url }),
-      });
-      const payload = await response.json().catch(() => ({}));
+      await captureWithHermes(apiBaseUrl, apiKey, url);
 
-      if (!response.ok) {
-        throw new Error(typeof payload.error === "string" ? payload.error : `${response.status} ${response.statusText}`);
+      const failedLinks: string[] = [];
+      for (const linkedUrl of linkedUrls) {
+        try {
+          await captureWithHermes(apiBaseUrl, apiKey, linkedUrl);
+        } catch (caught) {
+          failedLinks.push(`${linkedUrl}: ${caught instanceof Error ? caught.message : String(caught)}`);
+        }
+      }
+
+      if (failedLinks.length) {
+        setCaptureState((current) => ({ ...current, [post.uri]: "error" }));
+        setCaptureMessage((current) => ({
+          ...current,
+          [post.uri]: `Saved the Bluesky post, but ${failedLinks.length} linked page${failedLinks.length === 1 ? "" : "s"} failed. ${failedLinks[0]}`,
+        }));
+        return;
       }
 
       setCaptureState((current) => ({ ...current, [post.uri]: "saved" }));
-      setCaptureMessage((current) => ({ ...current, [post.uri]: "Saved to Hermes." }));
+      setCaptureMessage((current) => ({
+        ...current,
+        [post.uri]: linkedUrls.length ? `Saved post and ${linkedUrls.length} linked page${linkedUrls.length === 1 ? "" : "s"} to Hermes.` : "Saved post to Hermes.",
+      }));
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setCaptureState((current) => ({ ...current, [post.uri]: "error" }));
