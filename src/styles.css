@@ -415,6 +415,22 @@ h2 {
   margin-left: 0;
 }
 
+.capture-feedback {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-family: "Trebuchet MS", Verdana, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.capture-feedback.saved {
+  color: #2f855a;
+}
+
+.capture-feedback.error {
+  color: var(--danger);
+}
+
 @media (min-width: 700px) {
   .app-shell {
     padding-top: 30px;

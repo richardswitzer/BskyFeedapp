@@ -40,6 +40,7 @@ type FollowsResponse = {
 };
 
 type CaptureState = Record<string, "saving" | "saved" | "error">;
+type CaptureMessage = Record<string, string>;
 
 const apiBase = "https://public.api.bsky.app/xrpc";
 const discoverFeedUri = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot";
@@ -148,6 +149,7 @@ function App() {
   const [hermesApiBaseUrl, setHermesApiBaseUrl] = useState(defaultHermesApiBaseUrl);
   const [hermesApiKey, setHermesApiKey] = useState(defaultHermesApiKey);
   const [captureState, setCaptureState] = useState<CaptureState>({});
+  const [captureMessage, setCaptureMessage] = useState<CaptureMessage>({});
 
   useEffect(() => {
     let ignore = false;
@@ -210,11 +212,13 @@ function App() {
     const apiKey = hermesApiKey.trim();
 
     if (!apiBaseUrl || !apiKey) {
-      setError("Add your Hermes API URL and key in settings before saving posts.");
+      setCaptureState((current) => ({ ...current, [post.uri]: "error" }));
+      setCaptureMessage((current) => ({ ...current, [post.uri]: "Add your Hermes API URL and key in settings first." }));
       return;
     }
 
     setCaptureState((current) => ({ ...current, [post.uri]: "saving" }));
+    setCaptureMessage((current) => ({ ...current, [post.uri]: "Saving to Hermes..." }));
     setError("");
 
     try {
@@ -233,9 +237,15 @@ function App() {
       }
 
       setCaptureState((current) => ({ ...current, [post.uri]: "saved" }));
+      setCaptureMessage((current) => ({ ...current, [post.uri]: "Saved to Hermes." }));
     } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
       setCaptureState((current) => ({ ...current, [post.uri]: "error" }));
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setCaptureMessage((current) => ({
+        ...current,
+        [post.uri]: message === "Failed to fetch" ? `Could not reach Hermes API at ${apiBaseUrl}. Keep Hermes running locally, or use a LAN/tunnel URL on mobile.` : message,
+      }));
+      setError(message);
     }
   }
 
@@ -291,6 +301,7 @@ function App() {
       <section className="feed-list" aria-label="Bluesky posts">
         {feed.map(({ post, reason }) => {
           const state = captureState[post.uri];
+          const message = captureMessage[post.uri];
 
           return (
             <article className="post-card" key={post.uri}>
@@ -326,6 +337,7 @@ function App() {
                 </button>
                 <a href={postUrl(post)} target="_blank" rel="noreferrer">Open</a>
               </footer>
+              {message ? <p className={`capture-feedback ${state || ""}`}>{message}</p> : null}
             </article>
           );
         })}
