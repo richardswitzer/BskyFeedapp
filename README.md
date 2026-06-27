@@ -33,7 +33,7 @@ Hermes API URL: http://127.0.0.1:3217
 Hermes API key: HERMES_API_KEY from the repo .env file
 ```
 
-On a physical phone, `127.0.0.1` means the phone itself. Because GitHub Pages is HTTPS, mobile capture needs an HTTPS URL for Hermes, usually a temporary Cloudflare Tunnel during development.
+On a physical phone, `127.0.0.1` means the phone itself. Because GitHub Pages is HTTPS, mobile capture needs an HTTPS URL for Hermes. This machine uses Tailscale Funnel for that stable URL.
 
 From the Hermes workspace, keep both processes running:
 
@@ -42,7 +42,11 @@ npm run dev:api
 npm run dev:tunnel
 ```
 
-Then paste the generated `https://...trycloudflare.com` URL into Hermes capture settings instead of `http://127.0.0.1:3217`.
+Then use this URL in Hermes capture settings instead of `http://127.0.0.1:3217`:
+
+```text
+https://richard-t14s.tail9e9656.ts.net
+```
 
 ## Free Hosting Recommendation
 
