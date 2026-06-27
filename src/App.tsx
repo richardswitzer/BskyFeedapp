@@ -73,6 +73,24 @@ function normalizeApiBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/g, "");
 }
 
+function needsHttpsTunnel(apiBaseUrl: string): boolean {
+  return window.location.protocol === "https:" && apiBaseUrl.startsWith("http://");
+}
+
+function captureNetworkMessage(apiBaseUrl: string, message: string): string {
+  const lowerMessage = message.toLowerCase();
+
+  if (needsHttpsTunnel(apiBaseUrl)) {
+    return `Mobile GitHub Pages cannot reliably call plain HTTP Hermes at ${apiBaseUrl}. Use an HTTPS tunnel URL for Hermes capture.`;
+  }
+
+  if (lowerMessage === "failed to fetch" || lowerMessage === "load failed" || lowerMessage.includes("networkerror")) {
+    return `Could not reach Hermes API at ${apiBaseUrl}. Keep Hermes running, confirm the URL/key, or use an HTTPS tunnel on mobile.`;
+  }
+
+  return message;
+}
+
 function byNewestPost(left: FeedItem, right: FeedItem): number {
   const leftTime = Date.parse(left.post.record?.createdAt || "") || 0;
   const rightTime = Date.parse(right.post.record?.createdAt || "") || 0;
@@ -217,6 +235,15 @@ function App() {
       return;
     }
 
+    if (needsHttpsTunnel(apiBaseUrl)) {
+      setCaptureState((current) => ({ ...current, [post.uri]: "error" }));
+      setCaptureMessage((current) => ({
+        ...current,
+        [post.uri]: `Mobile GitHub Pages cannot reliably call plain HTTP Hermes at ${apiBaseUrl}. Use an HTTPS tunnel URL for Hermes capture.`,
+      }));
+      return;
+    }
+
     setCaptureState((current) => ({ ...current, [post.uri]: "saving" }));
     setCaptureMessage((current) => ({ ...current, [post.uri]: "Saving to Hermes..." }));
     setError("");
@@ -243,7 +270,7 @@ function App() {
       setCaptureState((current) => ({ ...current, [post.uri]: "error" }));
       setCaptureMessage((current) => ({
         ...current,
-        [post.uri]: message === "Failed to fetch" ? `Could not reach Hermes API at ${apiBaseUrl}. Keep Hermes running locally, or use a LAN/tunnel URL on mobile.` : message,
+        [post.uri]: captureNetworkMessage(apiBaseUrl, message),
       }));
       setError(message);
     }
